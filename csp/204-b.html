@@ -6,7 +6,7 @@
 <body>
   <script>
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/csp/serve/204/oktext?sessid={{.SessionID}}&corsOrigin=browseraudit.com&corsMethod=GET", false);
+    xhr.open("GET", "/csp/serve/204/oktext?sessid={{.SessionID}}&corsOrigin={{.Domain1}}&corsMethod=GET", false);
     xhr.send(null);
     if (xhr.status == 200) {
       var img = document.createElement("img");

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"code.google.com/p/gcfg"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/oschwald/geoip2-golang"
+	"gopkg.in/gcfg.v1"
+	"html/template"
 	"log"
 	"net/http"
 	"strings"
@@ -15,22 +16,35 @@ import (
 // Structure of server.cfg (INI file):
 type Config struct {
 	HTTPServer struct {
-		Host string
-		Port int
-		SessionIDSalt string
+		Host           string
+		Port           int
+		SessionIDSalt  string
 		GeoIP2Database string
+	}
+	Domain struct {
+		Domain1    string
+		Subdomain1 string
+		Domain2    string
+		Subdomain2 string
 	}
 	Memcached struct {
 		Host string
 		Port int
 	}
 	Database struct {
-		Host string
-		Port int
-		Username string
-		Password string
+		Host         string
+		Port         int
+		Username     string
+		Password     string
 		DatabaseName string `gcfg:"dbname"`
 	}
+}
+
+type TestTemplate struct {
+	Domain1    string
+	Subdomain1 string
+	Domain2    string
+	Subdomain2 string
 }
 
 var cfg Config
@@ -40,7 +54,7 @@ var geoipDB *geoip2.Reader
 
 func main() {
 	var err error // This allows us to use the global vars geoipDB and db with :=
-	
+
 	// Read configuration file
 	if err := gcfg.ReadFileInto(&cfg, "server.cfg"); err != nil {
 		log.Fatalf("Could not read server configuration file 'server.cfg': %s\n", err)
@@ -75,6 +89,7 @@ func main() {
 
 	r.HandleFunc("/set_referer", SetRefererHandler)
 	r.HandleFunc("/get_referer", GetRefererHandler)
+	r.HandleFunc("/get_referer_policy", GetRefererPolicyHandler)
 
 	r.HandleFunc("/set_hsts/{id:[0-9]+}/{policyBase64}", SetHSTSHandler)
 	r.HandleFunc("/clear_hsts/{id:[0-9]+}", ClearHSTSHandler)
@@ -109,6 +124,7 @@ func main() {
 	r.HandleFunc("/cors/allow-methods/{methodsBase64}", CorsAllowMethodsHandler)
 	r.HandleFunc("/cors/allow-headers/{headersBase64}", CorsAllowHeadersHandler)
 	r.HandleFunc("/cors/exposed-headers/{headersBase64}", CorsExposedHeadersHandler)
+	r.HandleFunc("/cors/allow-credentials/{originBase64}/{credentialsBase64}", CorsAllowCredentialsHandler)
 
 	r.HandleFunc("/results/{id:[0-9]+}/{passkey:[0-9a-f]+}", ResultsPageHandler)
 	r.HandleFunc("/suite_execution/get/{id:[0-9]+}/{passkey:[0-9a-f]+}", GetSuiteExecutionHandler)
@@ -117,12 +133,12 @@ func main() {
 	r.HandleFunc("/redirect/{dest}", RedirectHandler)
 
 	// Connect to the database server
-	var dbDataSource = fmt.Sprintf("host=%s port=%d user='%s' password='%s' dbname='%s'",
+	var dbDataSource = fmt.Sprintf("host=%s port=%d user='%s' password='%s' dbname='%s' sslmode=disable",
 		cfg.Database.Host,
 		cfg.Database.Port,
 		strings.Replace(cfg.Database.Username, "'", "\\'", -1),
 		strings.Replace(cfg.Database.Password, "'", "\\'", -1),
-		strings.Replace(cfg.Database.DatabaseName, "'", "\\'", -1))	
+		strings.Replace(cfg.Database.DatabaseName, "'", "\\'", -1))
 	if db, err = sqlx.Connect("postgres", dbDataSource); err != nil {
 		log.Fatalf("Could not connect to database server: %s\n", err)
 	}
@@ -152,6 +168,15 @@ func TestHandler(w http.ResponseWriter, r *http.Request) {
 	// cookie from a previous execution that might not have expired yet
 	store.New(w, r)
 
-	http.ServeFile(w, r, "./test.html")
+	p := &TestTemplate{
+		Domain1:    cfg.Domain.Domain1,
+		Domain2:    cfg.Domain.Domain2,
+		Subdomain1: cfg.Domain.Subdomain1,
+		Subdomain2: cfg.Domain.Subdomain2,
+	}
+	t, err := template.ParseFiles("./test.html")
+	if err != nil {
+		log.Println(err)
+	}
+	t.Execute(w, p)
 }
-

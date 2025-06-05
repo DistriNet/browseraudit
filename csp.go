@@ -13,11 +13,15 @@ import (
 type CSPTemplate struct {
 	SessionID    string
 	CookieDomain string
+	Domain1      string
+	Subdomain1   string
+	Domain2      string
+	Subdomain2   string
 }
 
 func CSPServeHandler(w http.ResponseWriter, r *http.Request) {
 	DontCache(&w)
-	
+
 	session := store.Get(w, r)
 	id := mux.Vars(r)["id"]
 	r.ParseForm()
@@ -45,11 +49,11 @@ func CSPServeHandler(w http.ResponseWriter, r *http.Request) {
 
 func CSPPassHandler(w http.ResponseWriter, r *http.Request) {
 	DontCache(&w)
-	
+
 	session := store.Get(w, r)
 	id := mux.Vars(r)["id"]
 	r.ParseForm()
-	
+
 	session.Set("csp"+id, "pass")
 	fmt.Println("Recording PASS for CSP test " + id)
 
@@ -58,11 +62,11 @@ func CSPPassHandler(w http.ResponseWriter, r *http.Request) {
 
 func CSPFailHandler(w http.ResponseWriter, r *http.Request) {
 	DontCache(&w)
-	
+
 	session := store.Get(w, r)
 	id := mux.Vars(r)["id"]
 	r.ParseForm()
-	
+
 	session.Set("csp"+id, "fail")
 	fmt.Println("Recording FAIL for CSP test " + id)
 
@@ -189,8 +193,12 @@ func CSPServeFile(w http.ResponseWriter, r *http.Request) {
 		// to exist, due to earlier call to addManualCookie()
 		session := store.Get(w, r)
 		p := &CSPTemplate{
-			SessionID: session.Id,
+			SessionID:    session.Id,
 			CookieDomain: cookieDomain,
+			Domain1:      cfg.Domain.Domain1,
+			Subdomain1:   cfg.Domain.Subdomain1,
+			Domain2:      cfg.Domain.Domain2,
+			Subdomain2:   cfg.Domain.Subdomain2,
 		}
 
 		t, err := template.ParseFiles(fileToServe)
@@ -208,7 +216,7 @@ func CSPResultHandler(w http.ResponseWriter, r *http.Request) {
 	session := store.Get(w, r)
 
 	id := mux.Vars(r)["id"]
-	result, err := session.Get("csp"+id)
+	result, err := session.Get("csp" + id)
 	fmt.Printf("Fetching result for CSP test %s: %s\n", id, result)
 	if err != nil {
 		log.Printf("nil result csp%s\n", id)

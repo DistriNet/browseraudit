@@ -67,7 +67,7 @@ func HttpOnlyCookieHandler(w http.ResponseWriter, r *http.Request) {
 	expires := time.Now().Add(5 * time.Minute)
 	cookie := &http.Cookie{Name: HTTPONLY_COOKIE_NAME,
 		Value:    HTTPONLY_COOKIE_SETVAL,
-		Domain:   ".browseraudit.com",
+		Domain:   "." + cfg.Domain.Domain1,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true}
@@ -80,12 +80,12 @@ func SetRequestSecureCookieHandler(w http.ResponseWriter, r *http.Request) {
 	expires := time.Now().Add(5 * time.Minute)
 	cookie := &http.Cookie{Name: REQUEST_SECURE_COOKIE_NAME,
 		Value:   REQUEST_SECURE_COOKIE_SETVAL,
-		Domain:  ".browseraudit.com",
+		Domain:  "." + cfg.Domain.Domain1,
 		Path:    "/",
 		Expires: expires,
 		Secure:  true}
 	http.SetCookie(w, cookie)
-	
+
 	http.ServeFile(w, r, "./static/pixel.png")
 }
 
@@ -106,7 +106,7 @@ func SetSessionSecureCookieHandler(w http.ResponseWriter, r *http.Request) {
 	session := store.Get(w, r)
 
 	c, err := r.Cookie(SESSION_SECURE_COOKIE_NAME)
-	if err == nil {
+	if err == nil && r.Header.Get("X-Scheme") != "https" {
 		session.Set(SESSION_SECURE_COOKIE_NAME, c.Value)
 	} else {
 		session.Set(SESSION_SECURE_COOKIE_NAME, "nil")

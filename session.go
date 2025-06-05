@@ -15,9 +15,8 @@ import (
 )
 
 const SESSION_ID_COOKIE_NAME = "sessid"
-const SESSION_ID_COOKIE_DOMAIN = ".browseraudit.com"
 
-// =============================================================================
+// =======================ß======================================================
 // BASessionStore
 // =============================================================================
 
@@ -35,7 +34,8 @@ func NewBASessionStore(memcachedHost string, memcachedPort int) *BASessionStore 
 // Creates a new session
 func (store *BASessionStore) New(w http.ResponseWriter, r *http.Request) *BASession {
 
-	random := make([]byte, 16); rand.Read(random)
+	random := make([]byte, 16)
+	rand.Read(random)
 	currentTime := strconv.FormatInt(time.Now().UnixNano(), 10)
 	ip := net.ParseIP(r.Header["X-Real-Ip"][0]).String()
 	userAgent := r.UserAgent()
@@ -44,11 +44,11 @@ func (store *BASessionStore) New(w http.ResponseWriter, r *http.Request) *BASess
 	sessionID := fmt.Sprintf("%x", sha1.Sum(plaintext))
 
 	//log.Printf("BASessionStore New(): generated session ID: %s", sessionID)
-	
+
 	cookie := &http.Cookie{
 		Name:    SESSION_ID_COOKIE_NAME,
 		Value:   sessionID,
-		Domain:  SESSION_ID_COOKIE_DOMAIN,
+		Domain:  "." + cfg.Domain.Domain1,
 		Path:    "/",
 		Expires: time.Now().Add(24 * time.Hour),
 	}
@@ -69,13 +69,13 @@ func (store *BASessionStore) Get(w http.ResponseWriter, r *http.Request) *BASess
 	if c, err := r.Cookie(SESSION_ID_COOKIE_NAME); err == nil && regexp.MustCompile("^[0-9a-f]{40}").MatchString(c.Value) {
 		sessionID = c.Value
 		//log.Printf("BASessionStore Get(): got session ID from cookie: %s", sessionID)
-	// - #2: look at the value of the "sessid" key in the URL query string
+		// - #2: look at the value of the "sessid" key in the URL query string
 	} else if r.ParseForm(); r.Form[SESSION_ID_COOKIE_NAME] != nil && regexp.MustCompile("^[0-9a-f]{40}").MatchString(r.Form.Get(SESSION_ID_COOKIE_NAME)) {
 		sessionID = r.Form.Get(SESSION_ID_COOKIE_NAME)
 		//log.Printf("BASessionStore Get(): got session ID from query string: %s", sessionID)
-	// - Otherwise, no session ID was sent with this request: generate a new one
-	//   based on the session ID salt in server.cfg, the remote IP and user agent
-	//   string, and set it as the value of the "sessid" cookie
+		// - Otherwise, no session ID was sent with this request: generate a new one
+		//   based on the session ID salt in server.cfg, the remote IP and user agent
+		//   string, and set it as the value of the "sessid" cookie
 	} else {
 		newSession := store.New(w, r)
 		//log.Printf("BASessionStore Get(): no session ID found, set new: %s", newSession.Id)
@@ -115,7 +115,7 @@ func (session *BASession) Get(key string) (string, error) {
 // Sets the value associated with the given key for this session
 func (session *BASession) Set(key string, value string) error {
 	item := memcache.Item{
-		Key:         session.Id + "|" + key,
+		Key:        session.Id + "|" + key,
 		Value:      []byte(value),
 		Expiration: 30,
 	}

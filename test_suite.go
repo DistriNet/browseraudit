@@ -38,22 +38,22 @@ func GenerateTestSuiteHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/javascript")
 	fmt.Fprintln(w, "// Automatically-generated BrowserAudit test suite\n")
-	
+
 	// The table returned by this query is sorted by the order in which the
 	// categories and then tests are to be executed; the hierarchy is correct by
 	// the time it gets here, and so can be printed line-by-line with no further
 	// processing of the resulting table
-	
+
 	// Suggestion for using WITH RECURSIVE courtesy of:
 	// http://blog.timothyandrew.net/blog/2013/06/24/recursive-postgres-queries/
 	// (note: WITH RECURSIVE is Postgres-specific)
 	rows, err := db.Query(`
 		WITH RECURSIVE touched_parent_categories AS (
-			SELECT unnest($1::int[]) AS id
+			SELECT unnest($1::bigint[]) AS id
 			UNION
 			SELECT category.parent AS id FROM category, touched_parent_categories tpc WHERE tpc.id = category.id AND category.parent IS NOT NULL
 		), touched_child_categories AS (
-			SELECT unnest($1::int[]) AS id
+			SELECT unnest($1::bigint[]) AS id
 			UNION
 			SELECT category.id FROM category, touched_child_categories tcc WHERE category.parent = tcc.id
 		), touched_categories AS (
@@ -62,7 +62,7 @@ func GenerateTestSuiteHandler(w http.ResponseWriter, r *http.Request) {
 			SELECT id FROM touched_child_categories
 		), hierarchy AS (
 			(
-				SELECT 'c' as type, id, title, description, NULL::test_behaviour AS behaviour, NULL::varchar AS test_function, NULL::smallint AS timeout, parent, array[execute_order] AS execute_order
+				SELECT 'c' as type, id, title, description, NULL::varchar AS behaviour, NULL::varchar AS test_function, NULL::smallint AS timeout, parent, array[execute_order] AS execute_order
 				FROM category
 				WHERE parent IS NULL AND live = true AND id IN (SELECT id FROM touched_categories)
 			) UNION (
@@ -72,7 +72,7 @@ func GenerateTestSuiteHandler(w http.ResponseWriter, r *http.Request) {
 					FROM test
 					WHERE live = true AND parent IN (SELECT id FROM touched_categories)
 					UNION
-					SELECT 'c' as type, id, title, description, NULL::test_behaviour AS behaviour, NULL::varchar AS test_function, NULL::smallint AS timeout, parent, execute_order
+					SELECT 'c' as type, id, title, description, NULL::varchar AS behaviour, NULL::varchar AS test_function, NULL::smallint AS timeout, parent, execute_order
 					FROM category
 					WHERE live = true AND id IN (SELECT id FROM touched_categories)
 				) e, hierarchy h
@@ -131,7 +131,7 @@ func GenerateTestSuiteHandler(w http.ResponseWriter, r *http.Request) {
 			parent = "null"
 		}
 
-		if (rowType == "c") { // row represents a category
+		if rowType == "c" { // row represents a category
 			fmt.Fprintf(
 				w,
 				"\nbrowserAuditTestFramework.addCategory(%d, %s, \"%s\", \"%s\");\n",

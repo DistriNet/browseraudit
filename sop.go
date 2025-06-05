@@ -14,6 +14,7 @@ import (
 type P2CParentPage struct {
 	Script   template.HTML
 	Result   string
+	Domain   string
 	TestId   int
 	ChildSrc template.URL
 }
@@ -29,6 +30,7 @@ type C2PParentPage struct {
 
 type C2PChildPage struct {
 	Script template.HTML
+	Domain string
 	Result string
 	TestId int
 }
@@ -58,7 +60,7 @@ func SOPFailHandler(w http.ResponseWriter, r *http.Request) {
 	session := store.Get(w, r)
 
 	id := mux.Vars(r)["id"]
-	
+
 	// If ?serveOnly=true, just serve the iframe: don't change the test
 	// state in the session cookie
 	r.ParseForm()
@@ -74,7 +76,7 @@ func SOPResultHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := mux.Vars(r)["id"]
 
-	result, err := session.Get("sop"+id)
+	result, err := session.Get("sop" + id)
 	if err != nil {
 		log.Printf("nil result sop%s", id)
 		result = "nil"
@@ -115,6 +117,7 @@ func SOPP2CParentHandler(w http.ResponseWriter, r *http.Request) {
 
 	p := &P2CParentPage{Script: script,
 		Result:   result,
+		Domain:   cfg.Domain.Domain1,
 		TestId:   int(idInt),
 		ChildSrc: template.URL(childSrc)}
 	t, err := template.ParseFiles("./sop/p2c_parent.html")
@@ -202,6 +205,7 @@ func SOPC2PChildHandler(w http.ResponseWriter, r *http.Request) {
 
 	p := &C2PChildPage{Script: script,
 		Result: result,
+		Domain: cfg.Domain.Domain1,
 		TestId: int(idInt)}
 	t, err := template.ParseFiles("./sop/c2p_child.html")
 	if err != nil {

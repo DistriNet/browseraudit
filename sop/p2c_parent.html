@@ -15,7 +15,7 @@
 
       if (d.location.protocol) {
         var img = document.createElement("img");
-        img.setAttribute("src", "https://browseraudit.com/sop/{{.Result}}/{{.TestId}}");
+        img.setAttribute("src", "https://{{.Domain}}/sop/{{.Result}}/{{.TestId}}");
         document.body.appendChild(img);
       }
     };

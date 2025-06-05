@@ -3,17 +3,34 @@
 // functions to be stored in and automatically extracted from the database
 // on-demand, making this file unnecessary)
 
+function getDomain(code) {
+	switch (code){
+		case 0:
+			return window.domain1;
+		case 1:
+			return window.subdomain1;
+		case 2:
+			return window.domain2;
+		case 3:
+			return window.subdomain2;
+		case -1:
+			return '*.' + window.domain1;
+		default:
+			return code;
+	}
+}
+
 // Same-Origin Policy -> DOM access
-// Same-Origin Policy -> DOM access - parent https://browseraudit.com, child https://test.browseraudit.com - child accessing parent
-// Same-Origin Policy -> DOM access - parent https://browseraudit.com, child https://test.browseraudit.com - parent accessing child
-// Same-Origin Policy -> DOM access - parent https://test.browseraudit.com, child https://browseraudit.com - child accessing parent
-// Same-Origin Policy -> DOM access - parent https://test.browseraudit.com, child https://browseraudit.com - parent accessing child
+// Same-Origin Policy -> DOM access - parent domain 1, child subdomain 1 - child accessing parent
+// Same-Origin Policy -> DOM access - parent domain 1, child subdomain 1 - parent accessing child
+// Same-Origin Policy -> DOM access - parent sudomain 1, child domain 1 - child accessing parent
+// Same-Origin Policy -> DOM access - parent subdomain 1, child domain 1 - parent accessing child
 var parentChildSopTest = function(testID, shouldBeBlocked, fromParent, parentPrefix, parentDocumentDomain, childPrefix, childDocumentDomain) {
   var defaultResult = (shouldBeBlocked) ? "pass" : "fail";
   var nresult = (defaultResult === "pass") ? "fail" : "pass";
   var p2c = fromParent ? "p2c" : "c2p";
-  var childSrc = childPrefix+"/sop/"+p2c+"/child/"+(fromParent?"":(testID+"/"))+childDocumentDomain+(fromParent?"":("/"+nresult));
-  var parSrc = parentPrefix+"/sop/"+p2c+"/parent/"+(fromParent?(testID+"/"):"")+parentDocumentDomain+(fromParent?("/"+nresult):"")+"/"+$.base64.encode(childSrc);
+  var childSrc = "https://"+getDomain(childPrefix)+"/sop/"+p2c+"/child/"+(fromParent?"":(testID+"/"))+getDomain(childDocumentDomain)+(fromParent?"":("/"+nresult));
+  var parSrc = "https://"+getDomain(parentPrefix)+"/sop/"+p2c+"/parent/"+(fromParent?(testID+"/"):"")+getDomain(parentDocumentDomain)+(fromParent?("/"+nresult):"")+"/"+$.base64.encode(childSrc);
 
 	var passBehaviourText = (shouldBeBlocked) ? "unable" : "able";
 	var failBehaviourText = (shouldBeBlocked) ? "able" : "unable";
@@ -62,9 +79,15 @@ var parentChildSopTest = function(testID, shouldBeBlocked, fromParent, parentPre
 var ajaxSopTest = function(testID, shouldBeBlocked, sourcePrefix, destPrefix) {
   var defaultResult = (shouldBeBlocked) ? "pass" : "fail";
   var result = (defaultResult === "pass") ? "fail" : "pass";
-  var dest = destPrefix+"/sop/"+result+"/"+testID;
+	var dest;
+	if (destPrefix > 3){
+		dest = "http://" + getDomain(destPrefix-4);
+	} else {
+		dest = "https://" + getDomain(destPrefix);
+	}
+  dest += "/sop/"+result+"/"+testID;
   var destBase64 = $.base64.encode(dest);
-  var iframeSrc = sourcePrefix+"/sop/ajax/"+testID+"/"+result+"/"+destBase64;
+  var iframeSrc = "https://"+getDomain(sourcePrefix)+"/sop/ajax/"+testID+"/"+result+"/"+destBase64;
 
 	var passBehaviourText = (shouldBeBlocked) ? "was not" : "was";
 	var failBehaviourText = (shouldBeBlocked) ? "was" : "was not";
@@ -109,10 +132,10 @@ var domainScopeCookieTest = function(testID, shouldBeUnset, domainSetFrom, cooki
   var timestamp = "" + new Date().getTime();
   var name = "sopscope"+id+timestamp;
   var value = (shouldBeUnset?"none":timestamp);
-  var domain = cookieDomain;
+  var domain = cookieDomain === ".com" ? cookieDomain : ("." + getDomain(cookieDomain));
   var path = "/";
-  var img1path = "https://"+domainSetFrom+"/sop/cookie/"+name+"/"+timestamp+"/"+domain+"/"+$.base64.encode(path);
-  var img2path = "https://"+domainAccessedFrom+"/sop/save_cookie/"+name;
+  var img1path = "https://"+getDomain(domainSetFrom)+"/sop/cookie/"+name+"/"+timestamp+"/"+domain+"/"+$.base64.encode(path);
+  var img2path = "https://"+getDomain(domainAccessedFrom)+"/sop/save_cookie/"+name;
 	
 	var passBehaviourText = (shouldBeUnset) ? "was not" : "was";
 	var failBehaviourText = (shouldBeUnset) ? "was" : "was not";
@@ -151,7 +174,7 @@ var domainScopeCookieTest = function(testID, shouldBeUnset, domainSetFrom, cooki
 // Same-Origin Policy -> Cookies - path scope
 var cookiePathScope = function(testID, shouldBeBlocked, name) {
   var value = "" + new Date().getTime();
-  var domain = ".browseraudit.com";
+  var domain = "." + window.domain1;
   var path = "/sop/path/";
   var imgSrc1 = "/sop/path/cookie/"+name+"/"+value+"/"+domain+"/"+$.base64.encode(path);
   var simgSrc1 = "\"/sop/path/cookie/"+name+"/"+value+"/"+domain+"/\"+$.base64.encode(\""+path+"\")";
@@ -193,7 +216,15 @@ var cookiePathScope = function(testID, shouldBeBlocked, name) {
 
 // Content Security Policy
 var cspTest = function(testID, cspID, policy, shouldBeBlocked, opts) {
-  var policyBase64 = $.base64.encode(policy);
+	var parsedPolicy = policy.replace(/{([^{}]+)}/g, function(keyExpr, key) {
+		var intKey = parseInt(key);
+		if (intKey > 3){
+			return "wss://" + getDomain(intKey-4);
+		} else {
+			return "https://" + getDomain(intKey);
+		}
+	});
+  var policyBase64 = $.base64.encode(parsedPolicy);
   var defaultResult = (shouldBeBlocked) ? "pass" : "fail";
   var iframe_src = "/csp/serve/" + cspID + "/param-html?policy=" + policyBase64 + "&defaultResult=" + defaultResult;
 
@@ -202,7 +233,7 @@ var cspTest = function(testID, cspID, policy, shouldBeBlocked, opts) {
 
 	var reportData = {
     iframeSrc: iframe_src,
-		iframeHTTPHeader: "Content-Security-Policy: " + policy
+		iframeHTTPHeader: "Content-Security-Policy: " + parsedPolicy
 	};
 
 	// Some CSP tests have other resources which should also be shown in the test
@@ -223,27 +254,31 @@ var cspTest = function(testID, cspID, policy, shouldBeBlocked, opts) {
 
 		// CSP test IDs 208-211 additionally require a cookieDomain parameter
 		if (208 <= cspID && cspID <= 211) {
-			reportData.innerIframeSrc += "&cookieDomain=browseraudit.com";
+			reportData.innerIframeSrc += "&cookieDomain=" + window.domain1;
 		}
-  }
+	}
+  // Display extra headers used for report-to tests
+  if (cspID === 267) {
+		reportData.ajaxHTTPHeader = 'Report-To: { "group":"endpoint-1", "max_age":31536000, "endpoints":[{"url":"https://' + window.domain1 + '/csp/pass/267/emptyhtml"}]} Reporting-Endpoints: endpoint-1="https://' + window.domain1 + '/csp/pass/267/emptyhtml"';
+	}
 
 	// Many CSP tests have prerequisites, otherwise they should be skipped; the
 	// following resolves the dependencies necessary for each sub-category of CSP
 	// test and ensures that the correct check appears in the test function body,
 	// so the user can see what (if any) prerequisite is necessary for a CSP test
 	// to execute
-	// - Test IDs 217-220 require the Worker API
-	if (217 <= testID && testID <= 220) {
+  // - Test IDs 217-220 and 430-434 require the Worker API
+  if ((217 <= testID && testID <= 220) || (430 <= testID && testID <= 434)) {
 		var prerequisiteMet = [ Modernizr.webworkers ];
 		var prerequisiteText = [ "!Modernizr.webworkers" ];
 		var prerequisiteSkipMessages = [ "The Worker API is not supported by this web browser." ];
-	// - Test IDs 221-224 require the SharedWorker API
-	} else if (221 <= testID && testID <= 224) {
+    // - Test IDs 221-224 and 435-439 require the SharedWorker API
+  } else if ((221 <= testID && testID <= 224) || (435 <= testID && testID <= 439)) {
 		var prerequisiteMet = [ Modernizr.sharedworkers ];
 		var prerequisiteText = [ "!Modernizr.sharedworkers" ];
 		var prerequisiteSkipMessages = [ "The SharedWorker API is not supported by this web browser." ];
 	// - Test IDs 241-260 require Flash Player to be installed and for the browser
-	//   not to be blocking it on browseraudit.com
+	//   not to be blocking it on domain 1
 	} else if (241 <= testID && testID <= 260) {
 		var prerequisiteMet = [ Modernizr.flash, !Modernizr.flash.blocked ];
 		var prerequisiteText = [ "!Modernizr.flash", "Modernizr.flash.blocked" ];
@@ -361,13 +396,14 @@ var cspTest = function(testID, cspID, policy, shouldBeBlocked, opts) {
 
 // Cross-Origin Resource Sharing -> Access-Control-Allow-Origin
 var originExpect = function(testID, allowOrigin, shouldBeBlocked) {
-	var urlstr = "https://test.browseraudit.com/cors/allow-origin/"+$.base64.encode(allowOrigin);
+	var parsedOrigin = (allowOrigin === "*" || allowOrigin === "none") ? allowOrigin : ("https://" + getDomain(allowOrigin));
+	var urlstr = "https://" + window.subdomain1 + "/cors/allow-origin/"+$.base64.encode(parsedOrigin);
 	
 	// "none" is a special keyword indicating to the BA server that no
 	// Access-Control-Allow-Origin HTTP header should be sent in the response
 	var reportData = {};
-	if (allowOrigin !== "none") {
-		reportData.ajaxHTTPHeader = "Access-Control-Allow-Origin: " + allowOrigin;
+	if (parsedOrigin !== "none") {
+		reportData.ajaxHTTPHeader = "Access-Control-Allow-Origin: " + parsedOrigin;
 	}
 
 	var test_template = shouldBeBlocked ?
@@ -413,7 +449,7 @@ var originExpect = function(testID, allowOrigin, shouldBeBlocked) {
 
 // Cross-Origin Resource Sharing -> Access-Control-Allow-Methods
 var methodExpect = function(testID, requestMethod, allowedMethods, shouldBeBlocked) {
-	var urlstr = "https://test.browseraudit.com/cors/allow-methods/"+$.base64.encode(allowedMethods);
+	var urlstr = "https://" + window.subdomain1 + "/cors/allow-methods/"+$.base64.encode(allowedMethods);
 	
 	// "none" is a special keyword indicating to the BA server that no
 	// Access-Control-Allow-Methods HTTP header should be sent in the response
@@ -468,7 +504,7 @@ var methodExpect = function(testID, requestMethod, allowedMethods, shouldBeBlock
 
 // Cross-Origin Resource Sharing -> Access-Control-Allow-Headers
 var headersExpect = function(testID, requestHeaders, allowedHeaders, shouldBeBlocked) {
-	var urlstr = "https://test.browseraudit.com/cors/allow-headers/"+$.base64.encode(allowedHeaders);
+	var urlstr = "https://" + window.subdomain1 + "/cors/allow-headers/"+$.base64.encode(allowedHeaders);
 
 	// "none" is a special keyword indicating to the BA server that no
 	// Access-Control-Allow-Headers HTTP header should be sent in the response
@@ -523,7 +559,7 @@ var headersExpect = function(testID, requestHeaders, allowedHeaders, shouldBeBlo
 
 // Cross-Origin Resource Sharing -> Access-Control-Expose-Headers
 var exposeExpect = function(testID, responseHeader, exposedHeaders, shouldBeBlocked) {
-	var urlstr = "https://test.browseraudit.com/cors/exposed-headers/"+$.base64.encode(exposedHeaders);
+	var urlstr = "https://" + window.subdomain1 + "/cors/exposed-headers/"+$.base64.encode(exposedHeaders);
 	
 	// "none" is a special keyword indicating to the BA server that no
 	// Access-Control-Expose-Headers HTTP header should be sent in the response
@@ -583,6 +619,67 @@ var exposeExpect = function(testID, responseHeader, exposedHeaders, shouldBeBloc
 	return test_template;
 };
 
+// Cross-Origin Resource Sharing -> Access-Control-Allow-Credentials
+var credentialsExpect = function (testID, allowOrigin, allowCredentials, shouldBeBlocked) {
+	var parsedOrigin = allowOrigin === "*" ? allowOrigin : ("https://" + getDomain(allowOrigin));
+	var urlstr = "https://" + window.subdomain1 + "/cors/allow-credentials/" + $.base64.encode(parsedOrigin) + "/" + $.base64.encode(allowCredentials);
+
+	var reportData = {};
+	var parsedOrigin = allowOrigin === '*' ? allowOrigin : getDomain(allowOrigin)
+	reportData.ajaxHTTPHeader = "Access-Control-Allow-Origin: " + parsedOrigin;
+	if (allowCredentials === "true") {
+		reportData.ajaxHTTPHeader += "\n" + "Access-Control-Allow-Credentials: " + allowCredentials;
+	}
+
+	var test_template = shouldBeBlocked
+		? function () {
+			var thisTest = this;
+			if (!Modernizr.cors) {
+				thisTest.SKIP("The cross-origin resource sharing mechanism is not supported by this web browser.");
+			}
+
+			$.ajax({
+				url: urlstr,
+				xhrFields: {
+					withCredentials: true
+				},
+				success: function () {
+					thisTest.WARNING("The cross-origin resource request was allowed.");
+				},
+				error: function (r, textStatus, errorThrown) {
+					thisTest.PASS("The cross-origin resource request was blocked.");
+				}
+			});
+		}
+		: function () {
+			var thisTest = this;
+			if (!Modernizr.cors) {
+				thisTest.SKIP("The cross-origin resource sharing mechanism is not supported by this web browser.");
+			}
+
+			$.ajax({
+				url: urlstr,
+				xhrFields: {
+					withCredentials: true
+				},
+				success: function () {
+					thisTest.PASS("The cross-origin resource request was allowed.");
+				},
+				error: function (r, textStatus, errorThrown) {
+					thisTest.WARNING("The cross-origin resource request was blocked.");
+				}
+			});
+		};
+
+	var test_source = test_template.toString().replace("urlstr", '"' + urlstr + '"');
+	test_template.toString = function () {
+		return test_source;
+	};
+	test_template.reportData = reportData;
+
+	return test_template;
+};
+
 // Cookies -> HttpOnly flag -> HTTP-only cookie set by server and accessed from JavaScript
 var cookiesHttpOnlyServerToScript = function(testID) {
 	var test_template = function() {
@@ -606,7 +703,7 @@ var cookiesHttpOnlyScriptDiscarded = function(testID) {
 		var thisTest = this;
     // path and domain are set on the off-chance that the browser doesn't
     // discard this cookie, it is picked up by /clear_cookies for deletion
-    document.cookie = "discard=browseraudit; HttpOnly; path=/; domain=.browseraudit.com";
+    document.cookie = "discard=browseraudit; HttpOnly; path=/; domain=." + window.domain1;
 
 		if (typeof $.cookie("discard") === "undefined") {
 			thisTest.PASS("The cookie could not be successfully set via JavaScript.");
@@ -625,7 +722,7 @@ var cookiesHttpOnlyScriptToServer = function(testID) {
 		var thisTest = this;
     // path and domain are set on the off-chance that the browser doesn't
     // discard this cookie, it is picked up by /clear_cookies for deletion
-    document.cookie = "destroyMe=browseraudit; HttpOnly; path=/; domain=.browseraudit.com";
+    document.cookie = "destroyMe=browseraudit; HttpOnly; path=/; domain=." + window.domain1;
 
     $.get("/get_destroy_me", function(destroyMe) {
 			if (destroyMe === "nil") {
@@ -665,7 +762,7 @@ var cookiesSecureServerToScriptHTTP = function(testID) {
   var test_template = function() {
 		var thisTest = this;
     $.get("/set_session_secure_cookie", function() {
-      $("<img>", { src: "http://browseraudit.com/set_session_secure_cookie" }).load(function() {
+      $("<img>", { src: "http://" + window.domain1 + "/set_session_secure_cookie" }).load(function() {
         $.get("/get_session_secure_cookie", function(data) {
 					if (data === "nil") {
 						thisTest.PASS("The cookie was not sent to the server.");
@@ -685,7 +782,7 @@ var cookiesSecureServerToScriptHTTP = function(testID) {
 var cookiesSecureScriptToServerHTTPS = function(testID) {
   var test_template = function() {
 		var thisTest = this;
-    $.cookie("requestSecureCookie", "227", { secure: true, path: "/", domain: ".browseraudit.com" });
+    $.cookie("requestSecureCookie", "227", { secure: true, path: "/", domain: "." + window.domain1 });
     $.get("/get_request_secure_cookie", function(data) {
 			if (data === "227") {
 				thisTest.PASS("The cookie was sent to the server.");
@@ -703,8 +800,8 @@ var cookiesSecureScriptToServerHTTPS = function(testID) {
 var cookiesSecureScriptToServerHTTP = function(testID) {
   var test_template = function() {
 		var thisTest = this;
-    $.cookie("sessionSecureCookie", "910", { secure: true, path: "/", domain: ".browseraudit.com" });
-    $("<img>", { src: "http://browseraudit.com/set_session_secure_cookie" }).load(function() {
+    $.cookie("sessionSecureCookie", "910", { secure: true, path: "/", domain: "." + window.domain1 });
+    $("<img>", { src: "http://" + window.domain1 + "/set_session_secure_cookie" }).load(function() {
       $.get("/get_session_secure_cookie", function(data) {
 				if (data === "nil") {
 					thisTest.PASS("The cookie was not sent to the server.");
@@ -723,9 +820,9 @@ var cookiesSecureScriptToServerHTTP = function(testID) {
 var requestRefererHTTPSToHTTP = function(testID) {
   var test_template = function() {
 		var thisTest = this;
-    $("<img>", { src: "http://browseraudit.com/set_referer" }).load(function() {
+    $("<img>", { src: "http://" + window.domain1 + "/set_referer" }).load(function() {
       $.get("/get_referer", function(referer) {
-				if (referer === "") {
+				if (referer === "" || referer === "https") {
 					thisTest.PASS("The Referer header was not sent in the request.");
 				} else {
 					thisTest.WARNING("The Referer header was sent in the request.");
@@ -738,23 +835,72 @@ var requestRefererHTTPSToHTTP = function(testID) {
 	return test_template;
 };
 
+// Request Headers -> Referrer-Policy
+var requestReferrerPolicy = function (testID, img_src, referrerPolicy, expected_result) {
+	var imgSrc = (img_src === "" ? img_src : "https://" + getDomain(img_src)) + "/set_referer";
+	var reportData = {
+		referrerPolicyHeader: "Referrer-Policy: " + referrerPolicy
+	};
+	var expected = "";
+
+	switch (expected_result) {
+		case "empty":
+			break;
+		case "origin":
+			expected = window.location.origin + "/";
+			break;
+		case "full":
+			expected = window.location.href;
+			break;
+	}
+
+	var test_template = function () {
+		var thisTest = this;
+		$("<img>", { src: imgSrc, referrerpolicy: referrerPolicy }).load(function () {
+			$.get("/get_referer_policy", function (referer) {
+				if (referer === expected || referer === "https") {
+					thisTest.PASS("The Referer header was set correctly by the browser.");
+				} else {
+					thisTest.WARNING("The Referer header was not set correctly by the browser.");
+				}
+			});
+		});
+	};
+
+	// Replace the template with the actual test source for displaying in the report
+	var test_source = test_template
+		.toString()
+		.replace("imgSrc", '"' + imgSrc + '"')
+		.replace("referrerPolicy", '"' + referrerPolicy + '"')
+		.replace("expected", '"' + expected + '"');
+	test_template.toString = function () {
+		return test_source;
+	};
+
+	test_template.reportData = reportData;
+	return test_template;
+};
+
 // Response Headers -> X-Frame-Options
-var frameOptionsTest = function(testID, shouldBeBlocked, sourcePrefix, frameOptions) {
+// isIframe: true if the test is being run in an <iframe> element, false if running in <frame> element
+var frameOptionsTest = function(testID, shouldBeBlocked, sourcePrefix, frameOptions, isIframe) {
+  var frameElement = isIframe ? "<iframe>" : "<frame>";
 	var defaultResult = (shouldBeBlocked) ? "pass" : "fail";
-	var frameOptionsBase64 = $.base64.encode(frameOptions);
-	var iframe_src = sourcePrefix+"/frameoptions/"+testID+"/"+defaultResult+"/"+frameOptionsBase64;
+	var parsedFrameOptions = (frameOptions === "SAMEORIGIN" || frameOptions === "DENY") ? frameOptions : ("ALLOW-FROM https://" + getDomain(frameOptions));
+	var frameOptionsBase64 = $.base64.encode(parsedFrameOptions);
+	var frame_src = "https://"+getDomain(sourcePrefix)+"/frameoptions/"+testID+"/"+defaultResult+"/"+frameOptionsBase64;
 	
 	var passBehaviourText = (shouldBeBlocked) ? "was not" : "was";
 	var failBehaviourText = (shouldBeBlocked) ? "was" : "was not";
 
 	var reportData = {
-		iframeSrc: iframe_src.replace("https://test.","https://").concat("?serveOnly=true"),
-		iframeHTTPHeader: "X-Frame-Options: " + frameOptions
+		frameSrc: frame_src.replace("https://test.","https://").concat("?serveOnly=true"),
+		frameHTTPHeader: "X-Frame-Options: " + parsedFrameOptions
 	};
 
 	var test_template = function() {
 		var thisTest = this;
-		$("<iframe>", { src: iframe_src }).appendTo("div#sandbox").load(function() {
+		$(frameElement, { src: frame_src }).appendTo("div#sandbox").load(function() {
 			$.get("/frameoptions/result/"+testID, function(result) {
 				if (result === "pass") {
 					thisTest.PASS("The document "+passBehaviourText+" rendered.");
@@ -766,7 +912,8 @@ var frameOptionsTest = function(testID, shouldBeBlocked, sourcePrefix, frameOpti
 	};
 
 	var test_source = test_template.toString()
-		.replace('iframe_src', '"'+iframe_src+'"')
+	  .replace("frameElement", '"' + frameElement + '"')
+    .replace("frame_src", '"' + frame_src + '"')
 		.replace('"+testID', testID+'"')
 		.replace('"+passBehaviourText+"', passBehaviourText)
 		.replace('"+failBehaviourText+"', failBehaviourText);
@@ -778,6 +925,18 @@ var frameOptionsTest = function(testID, shouldBeBlocked, sourcePrefix, frameOpti
 
 // Response Headers -> Strict-Transport-Security
 var hstsTest = function(testID, hstsPolicy, headerOrigin, testOrigin, expectedProtocol, opts) {
+	var parsedHeaderOrigin;
+	if (headerOrigin > 3){
+		parsedHeaderOrigin = "http://" + getDomain(headerOrigin-4);
+	} else {
+		parsedHeaderOrigin = "https://" + getDomain(headerOrigin);
+	}
+	var parsedTestOrigin;
+	if (testOrigin > 3){
+		parsedTestOrigin = "http://" + getDomain(testOrigin-4);
+	} else {
+		parsedTestOrigin = "https://" + getDomain(testOrigin);
+	}
 	var base64Policy = $.base64.encode(hstsPolicy);
 
 	var reportData = {
@@ -787,13 +946,13 @@ var hstsTest = function(testID, hstsPolicy, headerOrigin, testOrigin, expectedPr
 	var test_template = opts.setProtocolDelay ?
 		function() {
 			var thisTest = this;
-			$("<img>", { src: headerOrigin+"/set_hsts/"+testID+"/"+base64Policy }).load(function() {
+			$("<img>", { src: parsedHeaderOrigin+"/set_hsts/"+testID+"/"+base64Policy }).load(function() {
 				setTimeout(function() {
-					$("<img>", { src: testOrigin+"/set_protocol/"+testID }).load(function() {
+					$("<img>", { src: parsedTestOrigin+"/set_protocol/"+testID }).load(function() {
 						$.get("/get_protocol/"+testID, function(protocol) {
 							// Clear effects of HSTS policy set by the Strict-Transport-Security
 							// HTTP header earlier in the test
-							$("<img>", { src: headerOrigin+"/clear_hsts/"+testID }).load(function() {
+							$("<img>", { src: parsedHeaderOrigin+"/clear_hsts/"+testID }).load(function() {
 								if (protocol === expectedProtocol) {
 									thisTest.PASS("The image was served using the "+expectedProtocol+" protocol.");
 								} else {
@@ -806,12 +965,12 @@ var hstsTest = function(testID, hstsPolicy, headerOrigin, testOrigin, expectedPr
 			});
 		} : function() {
 			var thisTest = this;
-			$("<img>", { src: headerOrigin+"/set_hsts/"+testID+"/"+base64Policy }).load(function() {
-				$("<img>", { src: testOrigin+"/set_protocol/"+testID }).load(function() {
+			$("<img>", { src: parsedHeaderOrigin+"/set_hsts/"+testID+"/"+base64Policy }).load(function() {
+				$("<img>", { src: parsedTestOrigin+"/set_protocol/"+testID }).load(function() {
 					$.get("/get_protocol/"+testID, function(protocol) {
 						// Clear effects of HSTS policy set by the Strict-Transport-Security
 						// HTTP header earlier in the test
-						$("<img>", { src: headerOrigin+"/clear_hsts/"+testID }).load(function() {
+						$("<img>", { src: parsedHeaderOrigin+"/clear_hsts/"+testID }).load(function() {
 							if (protocol === expectedProtocol) {
 								thisTest.PASS("The image was served using the "+expectedProtocol+" protocol.");
 							} else {
@@ -824,11 +983,11 @@ var hstsTest = function(testID, hstsPolicy, headerOrigin, testOrigin, expectedPr
 		};
 
 	var test_source = test_template.toString()
-		.replace(/headerOrigin\+"/g, '"'+headerOrigin)
+		.replace(/headerOrigin\+"/g, '"'+parsedHeaderOrigin)
 		.replace('"+testID+"', testID)
 		.replace(/"\+testID/g, testID+'"')
 		.replace('"+base64Policy', base64Policy+'"')
-		.replace('testOrigin+"', '"'+testOrigin)
+		.replace('testOrigin+"', '"'+parsedTestOrigin)
 		.replace(/"\+expectedProtocol\+"/g, expectedProtocol)
 		.replace('expectedProtocol', '"'+expectedProtocol+'"');
 	if (opts.setProtocolDelay) {

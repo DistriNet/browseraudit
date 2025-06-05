@@ -7,6 +7,6 @@
   <!-- Chromium tries to load the page as a frame without the explicit type, and
        therefore looks at frame-src not object-src. We're trying to test object-
        src here, so use this type attribute to force it. -->
-  <object data="https://test.browseraudit.com/csp/fail/61/swf" type="application/x-shockwave-flash"></object>
+  <object data="https://{{.Subdomain1}}/csp/fail/61/swf" type="application/x-shockwave-flash"></object>
 </body>
 </html>

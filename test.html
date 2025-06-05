@@ -21,6 +21,9 @@
 
     <script src="/static/js/init.js"></script>
     <script src="/static/js/settings.js"></script>
+      <script src="/static/js/html_elements.js"></script>
+      <script src="/static/js/apis.js"></script>
+      <script src="/static/js/fingerprint.js"></script>
   </head>
   <body>
 	  <!-- Begin notification bar -->
@@ -135,14 +138,49 @@
 		<script src="/static/js/test_framework.js"></script>
 
 		<script>
+            window.domain1 = "{{.Domain1}}"
+            window.domain2 = "{{.Domain2}}"
+            window.subdomain1 = "{{.Subdomain1}}"
+            window.subdomain2 = "{{.Subdomain2}}"
 			if (browserAuditSettings.displaymode === "full" || browserAuditSettings.displaymode === "summary") browserAuditUI.scoreboard.show();
 			if (browserAuditSettings.displaymode === "full") browserAuditUI.testReportList.show();
 			browserAuditUI.notificationBar.setMessage("cloud-download", "The test suite is being prepared&hellip;", null);
-			browserAuditLoadDelayedScripts([
-				"/static/js/test_templates.js",
-				"/test_suite/"+browserAuditSettings.categories,
-				"/static/js/run.js"
-			]);
+            $.ajax({
+              type: "POST",
+              url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
+              data: JSON.stringify({user_agent: navigator.userAgent}),
+              dataType: "json",
+              contentType: "application/json",
+              success: function(data, status, xhr) {
+                $.ajax({
+                  type: "POST",
+                  url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
+                  data: JSON.stringify({api_fingerprint: JsApiSupport(), html_fingerprint: HTMLElementSupport()}),
+                  dataType: "json",
+                  contentType: "application/json",
+                  success: function(data, status, xhr) {
+                    browserAuditLoadDelayedScripts([
+                      "/static/js/test_templates.js",
+                      "/test_suite/"+browserAuditSettings.categories,
+                      "/static/js/run.js"
+                    ]);
+                  },
+                  error: function(xhr, status, err) {
+                    if (xhr.status == 400) {
+                      browserAuditUI.notificationBar.setMessage("off", "Test results were already received for this unique URL. Please generate a new one to upload test results for another device.", null);
+                    } else {
+                      browserAuditUI.notificationBar.setMessage("off", "There was a problem contacting the server. Please try again later", null);                    }
+                  }
+                });
+              },
+              error: function(xhr, status, err) {
+                if (xhr.status == 400) {
+                  browserAuditUI.notificationBar.setMessage("off", "Test results were already received for this unique URL. Please generate a new one to upload test results for another device.", null);
+                } else {
+                  browserAuditUI.notificationBar.setMessage("off", "There was a problem contacting the server. Please try again later", null);
+                }
+              }
+            });
 		</script>
   </body>
 </html>

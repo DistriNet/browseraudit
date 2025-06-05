@@ -14,25 +14,25 @@
 	var callbackFunctions = {
 		startSuite: function(start) {
 			// Remove all cookies that might have persisted from previous runs
-			$.each([ "browseraudit.com", "browseraudit.com/sop/path", "test.browseraudit.com", "browseraudit.org", "test.browseraudit.org" ], function(i, v) {
+			$.each([ window.domain1, window.domain1 + "/sop/path", window.subdomain1, window.domain2, window.subdomain2 ], function(i, v) {
 				$("<img>", { src: "https://" + v + "/clear_cookies" }).appendTo(testSandbox);
 			});
 
-			// Create cookies used for CSP tests (for now, just on browseraudit.com)
-			$.each([ "browseraudit.com" ], function(i, v) {
+			// Create cookies used for CSP tests
+			$.each([ window.domain1 ], function(i, v) {
 				$("<img>", { src: "https://" + v + "/csp_cookie" }).appendTo(testSandbox);
 			});
 
 			testSandbox.waitForImages(function() {
 				// Remove the cookie-clearing images from the sandbox, and mirror the
-				// .browseraudit.com session cookie that was set when we loaded the page
-				// onto .browseraudit.org
-				$("<img>", { src: "https://browseraudit.org/set_sessid_cookie/" + $.cookie("sessid") }).appendTo(testSandbox);
+				// domain 1 session cookie that was set when we loaded the page
+				// onto domain 2
+				$("<img>", { src: "https://" + window.domain2 + "/set_sessid_cookie/" + $.cookie("sessid") }).appendTo(testSandbox);
 
 				testSandbox.waitForImages(function() {
 					// Reset local/session storage
 					$("<iframe>", { src: "/static/reset_local_storage.html" }).appendTo(testSandbox).load(function() {
-						$("<iframe>", { src: "https://test.browseraudit.com/static/reset_local_storage.html" }).appendTo(testSandbox).load(function() {
+						$("<iframe>", { src: "https://" + window.subdomain1 + "/static/reset_local_storage.html" }).appendTo(testSandbox).load(function() {
 							// Remove all elements from the test sandbox, and run the test suite
 							testSandbox.empty();
 							browserAuditUI.scoreboard.setTotal(browserAuditTestFramework.getTestTotal());
@@ -62,35 +62,32 @@
 			// Send test suite results back to BA server, if permitted
 			if (browserAuditSettings.sendresults) {
 				var sendResults = function() {
-					browserAuditUI.notificationBar.setMessage("cloud-upload", "Sending test results to BrowserAudit&hellip;", null);
+					browserAuditUI.notificationBar.setMessage("cloud-upload", "Uploading results to server...", null);
 
 					var suiteExecution = {
-						settings: {
-							displaymode: browserAuditSettings.displaymode
-						},
 						testResults: testResultsForUpload
 					};
 
 					$.ajax({
 						type: "POST",
-						url: "/suite_execution/put",
+						url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
 						data: JSON.stringify(suiteExecution),
-						dataType: "text",
+						dataType: "json",
+						contentType: "application/json",
 						success: function(data, status, xhr) {
-							var res = data.split(" ", 2); // 0=ID, 1=passkey
-							browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing. You can refer to these test results again at any time using <a href=\"/results/"+res[0]+"/"+res[1]+"\">this link</a>.", null);
+							browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing and the results were sent, thank you!", null);
 						},
 						error: function(xhr, status, err) {
 							// HTTP status code 400 indicates a problem with the JSON object
 							// sent to the server - we shouldn't suggest resending it, because
 							// it (probably) won't be accepted by the server next time either
 							if (xhr.status == 400) {
-								browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing, but there was a problem with the test results sent to BrowserAudit. If you would like to record your test results, click here to run the test suite again.", function() { document.location.reload(true); });
+								browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing, but test results were already received for this unique URL. Please generate a new one to upload test results for another device.", null);
 							// Any other HTTP status code indicates some other problem not
 							// related to the data we sent, and it might succeed if we try
 							// sending it again
 							} else {
-								browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing, but there was a problem sending the test results to BrowserAudit. Click here to try sending them again.", sendResults);
+								browserAuditUI.notificationBar.setMessage("off", "The test suite has finished executing, but there was a problem uploading the test results to the server. Click here to try sending them again.", sendResults);
 							}
 						}
 					});

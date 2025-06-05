@@ -35,6 +35,12 @@ port=8080
 sessionidsalt=
 geoipdatabase=
 
+[domains]
+domain1=
+subdomain1=
+domain2=
+subdomain2=
+
 ; ==============================================================================
 ; MEMCACHED CONFIGURATION
 ; ==============================================================================

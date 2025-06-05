@@ -28,7 +28,7 @@ func CorsAllowMethodsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "https://browseraudit.com")
+	w.Header().Set("Access-Control-Allow-Origin", "https://"+cfg.Domain.Domain1)
 	if string(methods) != "none" {
 		w.Header().Set("Access-Control-Allow-Methods", string(methods))
 	}
@@ -42,7 +42,7 @@ func CorsAllowHeadersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Access-Control-Allow-Origin", "https://browseraudit.com")
+	w.Header().Set("Access-Control-Allow-Origin", "https://"+cfg.Domain.Domain1)
 	if string(headers) != "none" {
 		w.Header().Set("Access-Control-Allow-Headers", string(headers))
 	}
@@ -59,8 +59,26 @@ func CorsExposedHeadersHandler(w http.ResponseWriter, r *http.Request) {
 	DontCache(&w)
 	w.Header().Set("Last-Modified", "Sun, 15 Jun 2014 18:40:03 GMT")
 	w.Header().Set("Content-Language", "en")
-	w.Header().Set("Access-Control-Allow-Origin", "https://browseraudit.com")
+	w.Header().Set("Access-Control-Allow-Origin", "https://"+cfg.Domain.Domain1)
 	if string(headers) != "none" {
 		w.Header().Set("Access-Control-Expose-Headers", string(headers))
 	}
+}
+
+func CorsAllowCredentialsHandler(w http.ResponseWriter, r *http.Request) {
+	originBase64 := mux.Vars(r)["originBase64"]
+	credentialsBase64 := mux.Vars(r)["credentialsBase64"]
+	origin, err := base64.StdEncoding.DecodeString(originBase64)
+	credentials, err2 := base64.StdEncoding.DecodeString(credentialsBase64)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if err2 != nil {
+		log.Println(err2)
+		return
+	}
+
+	w.Header().Set("Access-Control-Allow-Origin", string(origin))
+	w.Header().Set("Access-Control-Allow-Credentials", string(credentials))
 }
