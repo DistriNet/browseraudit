@@ -70,7 +70,7 @@
 
 					$.ajax({
 						type: "POST",
-						url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
+						url: "https://checkengine.distrinet-research.be/test_results/" + window.location.search.substring(7),
 						data: JSON.stringify(suiteExecution),
 						dataType: "json",
 						contentType: "application/json",

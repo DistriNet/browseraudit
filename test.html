@@ -147,14 +147,14 @@
 			browserAuditUI.notificationBar.setMessage("cloud-download", "The test suite is being prepared&hellip;", null);
             $.ajax({
               type: "POST",
-              url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
+              url: "https://checkengine.distrinet-research.be/test_results/" + window.location.search.substring(7),
               data: JSON.stringify({user_agent: navigator.userAgent}),
               dataType: "json",
               contentType: "application/json",
               success: function(data, status, xhr) {
                 $.ajax({
                   type: "POST",
-                  url: "https://app.experiment.websand.eu/test_results/" + window.location.search.substring(7),
+                  url: "https://checkengine.distrinet-research.be/test_results/" + window.location.search.substring(7),
                   data: JSON.stringify({api_fingerprint: JsApiSupport(), html_fingerprint: HTMLElementSupport()}),
                   dataType: "json",
                   contentType: "application/json",
